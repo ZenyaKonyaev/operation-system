@@ -58,7 +58,7 @@ int main()
         }
     }
 
-    fprintf(stdout, "text from parent (end code):\npidChild1=%d\npidChild2=%d\n\n", pidsChilds[0], pidsChilds[1]);
+    printf("text from parent (end code):\npidChild1=%d\npidChild2=%d\n\n", pidsChilds[0], pidsChilds[1]);
 
     return 0;
 }

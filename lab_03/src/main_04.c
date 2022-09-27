@@ -4,81 +4,65 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define OK 0
-#define FORK_FAILURE 1
-#define EXEC_FAILURE 2
-#define PIPE_FAILURE 3
-
-#define N 2
-#define SLP_INTV 2
-#define BUFFSIZE 128
+#define ERROR_FORK -1
+#define CHILD_FORK 0
 
 int main() 
 {
-    int child[N];
-    int fd[N];
-    int pid;
+    int pidsChilds[2];
+    char *msgs[2] = { "Message from first child\n", "Message from second child\n" };
+    int fd[2];
+    pipe(fd);
 
-    const char *const messages[N] = { "First message!\n", "Second message!\n" };
-    char buffer[BUFFSIZE] = { 0 };
+    printf("text from parent (start code):\npid = %d\ngroup = %d\n\n", getpid(), getpgrp());
 
-    if (-1 == pipe(fd))
-    {
-        perror("Cant pipe.");
-        return PIPE_FAILURE;
-    }
+    for (int i = 0; i < 2; ++i) {
+        int pid = fork();
 
-    fprintf(stdout, "Parent process. PID: %d, GROUP: %d\n", getpid(), getpgrp());
-
-    for (size_t i = 0; i < N; i++) 
-    {
-        pid = fork();
-
-        if (-1 == pid) 
-        {
-            perror("Cant fork.");
-            return FORK_FAILURE;
+        if (pid == ERROR_FORK) {
+            printf("Error at fork\n");
+            return 1;
         } 
-        else if (0 == pid) 
-        {
+        else if (pid == CHILD_FORK) {
+            sleep(1 * (i + 1));
+            printf("text from %d child:\npid=%d\nppid=%d\ngroup=%d\n\n", i + 1, getpid(), getppid(), getpgrp());
+            
             close(fd[0]);
-            write(fd[1], messages[i], strlen(messages[i]));
-            fprintf(stdout, "Message #%d sent to parent!\n", i + 1);
-
-            return OK;
-        } else 
-        {
-            child[i] = pid;
-        }
+            write(fd[1], msgs[i], strlen(msgs[i])); 
+            
+            return 0;
+        } 
+        else
+            pidsChilds[i] = pid;
     }
-
-    for (size_t i = 0; i < N; i++) 
+    
+    for (int i = 0; i < 2; i++) 
     {
-        int status, statval;
+        int status;
 
         pid_t childpid = wait(&status);
-        fprintf(stdout, "Child process (PID %d) finished. Status: %d\n", childpid, status);
+        printf("text from parent (child process finished):\nchildPid = %d\nstatus=%d\n", childpid, status);
 
-        if (WIFEXITED(statval)) 
+        if (WIFEXITED(status)) 
         {
-            fprintf(stdout, "Child process #%d finished with code: %d\n", i + 1, WEXITSTATUS(statval));
+            printf("%d child:\nfinished with code=%d\n\n", i + 1, WEXITSTATUS(status));
         }
-        else if (WIFSIGNALED(statval))
+        else if (WIFSIGNALED(status))
         {
-            fprintf(stdout, "Child process #%d finished from signal with code: %d\n", i + 1, WTERMSIG(statval));
+            printf("%d child:\nfinished from signal with code=%d\n\n", i + 1, WTERMSIG(status));
         }
-        else if (WIFSTOPPED(statval))
+        else if (WIFSTOPPED(status))
         {
-            fprintf(stdout, "Child process #%d finished stopped with code: %d\n", i + 1, WSTOPSIG(statval));
+            printf("%d child:\nfinished stopped with code=%d\n\n", i + 1, WSTOPSIG(status));
         }
-
     }
-
+    
+    char buf[256];
     close(fd[1]);
-    read(fd[0], buffer, BUFFSIZE);
+    read(fd[0], buf, 256);
+    printf("text from childs to parent:\n%s\n", buf);
 
-    fprintf(stdout, "Received messages:\n%s", buffer);
-    fprintf(stdout, "Parent process. Children ID: %d, %d.\nParent process is dead.\n", child[0], child[1]);
+    printf("text from parent (end code):\npidChild1=%d\npidChild2=%d\n\n", pidsChilds[0], pidsChilds[1]);
 
-    return OK;
+    return 0;
 }
